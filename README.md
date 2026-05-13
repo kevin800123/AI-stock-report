@@ -11,12 +11,13 @@
     - **PER (本益比)**：自動對應預估 EPS 與 PE 倍數。
     - **PBR (股價淨值比)**：自動對應每股淨值 (BVPS) 與 P/B 倍數，特別適合分析半導體、面板與金融類股。
 - **🔍 溯源驗證系統**：AI 會優先根據報告中的「目標價」反向溯源計算基礎，確保數據不再與報告打架。
+- **📱 手機友善**：首頁報告列表在小螢幕改為卡片版面，頂部導覽與按鈕加大觸控區，並保留瀏海機安全區（safe area）。
 
 ## 🛠️ 系統架構
 
-- **前端**：React + Vite + Tailwind CSS (使用 Lucide 圖標庫)
+- **前端**：React + Vite + Tailwind CSS（Lucide 圖標）
 - **後端**：Python FastAPI
-- **AI 核心**：Google Gemini 2.0 Flash API
+- **AI 核心**：Google Gemini 2.5 Flash API
 - **數據源**：Yahoo Finance (yfinance)
 - **同步終端**：Notion API (Official SDK)
 - **資料庫**：本機 SQLite；雲端建議 PostgreSQL（環境變數 `DATABASE_URL`）
@@ -24,26 +25,31 @@
 ## 📂 專案結構
 
 ```
-AI投顧報告整理App/
-├── frontend/                 # React 前端介面
-│   └── src/
-│       ├── pages/            # Dashboard, Summary, Settings
-│       └── api.js            # API 通訊模組
-├── backend/                  # FastAPI 後端服務
+投顧報告整理App/
+├── frontend/
+│   ├── src/
+│   │   ├── pages/           # Dashboard, Summary
+│   │   └── api.js
+│   └── .env.example
+├── backend/
 │   ├── app/
-│   │   ├── services/         # 核心邏輯 (report_processor, notion_service)
-│   │   ├── models/           # 數據模型
-│   │   └── routers/          # API 路由
-│   └── data/                 # SQLite 資料庫與上傳檔案存放區
-├── render.yaml               # Render Blueprint（後端 Web Service）
-├── start_all.bat             # Windows 一鍵啟動腳本
+│   │   ├── services/        # report_processor, notion_service
+│   │   ├── models/
+│   │   └── routers/
+│   └── data/                # 本機 SQLite 與上傳 PDF（勿提交）
+├── .github/
+│   └── workflows/
+│       └── deploy-gh-pages.yml   # 建置前端並推送 gh-pages
+├── render.yaml              # Render Blueprint（後端）
+├── start_all.bat / start_all.sh
 └── README.md
 ```
 
-## 🚀 快速啟動
+## 🚀 本機快速啟動
 
 ### 1. 環境設定
-在 `backend/` 目錄下建立 `.env` 檔案，並填入以下資訊：
+
+在 `backend/` 下建立 `.env`（可複製 `backend/.env.example`），**勿將 `.env` 提交到 Git**。
 
 ```env
 GEMINI_API_KEY=您的Gemini金鑰
@@ -53,60 +59,75 @@ DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 ```
 
 ### 2. 安裝與執行
-最簡單的方式是直接執行根目錄下的啟動腳本：
 
-- **Windows**: 點擊 `start_all.bat`
-- **macOS/Linux**: `bash start_all.sh`
+- **Windows**：執行 `start_all.bat`
+- **macOS/Linux**：`bash start_all.sh`
 
-啟動後，瀏覽器會自動開啟前端介面（預設為 `http://localhost:5173`）。
+前端預設 `http://localhost:5173`，後端 `http://127.0.0.1:8000`。
+
+### 3. 前端環境變數（選填）
+
+見 `frontend/.env.example`：`VITE_API_BASE_URL`（連遠端 API）、`VITE_API_TIMEOUT_MS`（逾時毫秒，預設本機 30s、正式建置 120s）。
+
+---
 
 ## 📝 使用流程
 
-1. **設定金鑰**：至「系統設定」頁面確認 Notion 與 AI 金鑰已正確設定。
-2. **上傳報告**：在首頁將 PDF 報告拖入上傳區。
-3. **AI 分析**：系統會自動完成 `解析 PDF` -> `AI 摘要` -> `即時股價對比`。
-4. **自動同步**：完成後，摘要將自動推送到您的 Notion 資料庫中，並建立美觀的分析卡片。
+1. **金鑰**：Notion / Gemini 置於 `backend/.env`（或後端平台的環境變數）。
+2. **上傳**：Dashboard 上傳 PDF；**Render 免費方案休眠**時可先按 **「叫醒後端」**（呼叫 `/health`）再操作。
+3. **流程**：解析 PDF → AI 摘要 →（可選）寫入 Notion。
+4. **摘要預覽**：completed 的報告可在「摘要預覽」檢視。
 
-## 🌐 部署到 GitHub Pages + Render（建議流程）
+---
 
-整體順序：**先把後端上架 Render 並取得網址** → **再在 GitHub 設定 Secret 並觸發前端部署**。
+## 🌐 部署：GitHub Pages + Render
 
-### 一、後端：Render
+順序建議：**後端 Render 可連線** → **GitHub Secret `VITE_API_BASE_URL`** → **觸發前端 workflow**。
 
-1. 將程式推到 GitHub 後，至 [Render](https://dashboard.render.com) → **New** → **Blueprint**（或 **Web Service** 手動建立）。
-2. 若用 Blueprint：選擇此 repo，Render 會讀取根目錄 `render.yaml`。
-3. 在 Render 後台的 **Environment** 設定（Blueprint 會提示你填）：
-   - **`GEMINI_API_KEY`**、**`NOTION_API_KEY`**、**`NOTION_DATABASE_ID`**：與本機 `backend/.env` 相同。
-   - **`DATABASE_URL`（強烈建議）**：在 Render 建立 **PostgreSQL**，於資料庫頁複製 **Internal Database URL**（`postgresql://…`）貼到 Web Service 的環境變數。程式會自動改為 `postgresql+asyncpg://`。
-     - 若不設 `DATABASE_URL`，服務會退回容器內 SQLite，**免費方案重啟後資料可能消失**，僅適合試用。
-4. 部署完成後記下後端網址，例如 **`https://ai-invest-report-api.onrender.com`**。開啟 **`https://…/health`** 應回傳 `{"status":"ok"}`。
-   - 免費 Web 服務休眠後**第一次請求會較慢**，屬正常現象。
+### 後端（Render）
 
-### 二、前端：GitHub Pages
+1. 將 repo 推到 GitHub，至 [Render](https://dashboard.render.com) → **Blueprint** 或 **Web Service**，對應根目錄 `render.yaml` 或手動指定 `backend`、`uvicorn app.main:app --host 0.0.0.0 --port $PORT`。
+2. **環境變數**：`GEMINI_API_KEY`、`NOTION_API_KEY`、`NOTION_DATABASE_ID`；**強烈建議**另建 **PostgreSQL**，將 **Internal Database URL** 設為 `DATABASE_URL`。
+3. 部署後測試：`https://你的服務.onrender.com/health` → `{"status":"ok"}`。
+4. **免費 Web Service** 閒置會休眠，**首次請求常需數十秒**；須穩定低延遲請升級方案。
 
-1. 在 GitHub Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**：
-   - 名稱：**`VITE_API_BASE_URL`**
-   - 值：**`https://你的服務.onrender.com`**（**不要**結尾 `/`，且建議 `https`）。
-2. 推送程式到 **`main`** 或 **`master`**（或到 **Actions** 手動執行 **Deploy to GitHub Pages**）。
-3. Repo → **Settings** → **Pages**：**Build and deployment** → **Deploy from a branch** → 選 **`gh-pages`**、資料夾 **`/(root)`**。
-4. 完成後前端網址為：**`https://<GitHub 使用者>.github.io/<儲存庫名稱>/`**  
-   若 repo 名為 **`<使用者>.github.io`**，workflow 會用根路徑，網址為 **`https://<使用者>.github.io/`**。
+### 前端（GitHub Pages）
 
-### 三、環境變數對照
+1. **Repository secret**（Actions）：**`VITE_API_BASE_URL`** = `https://你的服務.onrender.com`（**無結尾斜線**）。
+2. Push 到 `main` 或手動執行 workflow **Deploy to GitHub Pages**。
+3. **Settings → Pages**：
+   - **免費帳號**：私有 repo **無法**使用 Pages，請改為 **Public**，或升級 GitHub Pro。
+   - **本專案**使用 peaceiris 將靜態檔推到 **`gh-pages` 分支**，請選 **Deploy from a branch** → Branch **`gh-pages`** / **`/(root)`**。（若只顯示「GitHub Actions」為來源，請改為 **Deploy from a branch** 並選 `gh-pages`，與本倉 workflow 一致。）
+4. 網址：`https://<使用者>.github.io/<儲存庫名>/`（使用者網站 repo `<使用者>.github.io` 則為根路徑）。
+
+### CI 與 lock 檔
+
+GitHub Actions 使用 **`npm ci`**，請在本機變更依賴後執行 **`npm install`**（於 `frontend/`），並**一併提交** `package-lock.json`，否則建置會失敗。
+
+### 環境變數對照
 
 | 位置 | 變數 | 說明 |
 |------|------|------|
-| Render Web Service | `GEMINI_API_KEY`, `NOTION_*`, `DATABASE_URL` | 後端執行與持久化 |
-| GitHub Actions Secret | `VITE_API_BASE_URL` | 建置前端時寫入 API 根網址（指向 Render） |
+| Render Web Service | `GEMINI_API_KEY`, `NOTION_*`, `DATABASE_URL` | 後端與資料庫 |
+| GitHub Actions Secret | `VITE_API_BASE_URL` | 建置前端時嵌入後端根網址 |
 
-後端已允許 **`https://*.github.io`** 的 CORS。
+後端 CORS 已包含 **`https://*.github.io`**。
 
-### 四、Render 部署失敗（Exited with status 1）
+### 常見問題
 
-常見原因：
-
-1. **缺少依賴**：請確認 `requirements.txt` 含 `yfinance`（報告處理會 `import yfinance`）。若日誌為 `ModuleNotFoundError: No module named 'yfinance'`，拉最新程式後重新部署。
-2. **PostgreSQL 連不上**：確認 Web Service 的 **`DATABASE_URL`** 為同一帳號 Postgres 的 **Internal**，或 External URL 且可從網路連線；必要時檢查 Render 該次 deploy 的 **Logs** 內 `asyncpg` / `connection refused` 訊息。
+| 問題 | 處理 |
+|------|------|
+| 前端 `timeout` / 逾時 | 正式站 Axios 預設 **120s**；冷啟動仍慢時先按 **叫醒後端** 或手動開 `/health`。 |
+| Render `Exited with status 1` | 確認 `requirements.txt` 含 **`yfinance`**；檢查 Postgres **`DATABASE_URL`** 與 Logs。 |
+| `npm ci` 與 lock 不同步 | 於 `frontend/` 執行 `npm install` 後提交 `package-lock.json`。 |
 
 ---
+
+## 🔒 資安與隱私（簡述）
+
+- **API 網址**：瀏覽器本來就會向後端發請求，**網址無法對使用者完全隱藏**；頁尾 **僅在開發模式 (`npm run dev`)** 顯示 API 字樣，正式站不顯示，但開發者工具仍可能看到請求目標。
+- **金鑰**：Gemini / Notion 等**僅能放後端環境變數**（或本機 `backend/.env`），**不要**寫進前端或公開 repo。
+
+---
+
 *本專案僅供學術與效率提升使用，投資有風險，報告數據僅供參考。*
