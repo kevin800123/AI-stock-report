@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import date, datetime
 from pathlib import Path
 
 import fitz  # PyMuPDF
@@ -14,10 +15,24 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import Report, Setting
+from app.services.notion_service import create_notion_page
+
+
 class _AiReportSummary(BaseModel):
     category: str = Field(..., description="產業類別(例如: 半導體/金融/電子/生技等)")
-    ticker: str = Field(..., description="股票代號與名稱")
-    report_date: str = Field(..., description="報告發布日期 (例如: 2025/12/09)")
+    ticker: str = Field(
+        ...,
+        description="股票欄位請用「台股代號 空格 中文簡稱」，例如：2330 台積電、2344 華邦電；勿用括號格式。",
+    )
+    stock_code: str | None = Field(
+        None,
+        description="四位台股代號（數字），若能辨識請填，便於系統與 yfinance 對接。",
+    )
+    stock_name: str | None = Field(
+        None,
+        description="公司中文簡稱（不含代號），若能辨識請填，例如：台積電。",
+    )
+    report_date: str = Field(..., description="報告發布日期 (例如: 2025/12/09 或 2025-12-09)")
     advisor_name: str = Field(..., description="投顧或券商名稱 (例如: 國票、群益、元大等)")
     current_price: float | None = Field(None, description="報告提及的當前股價 (Current Price)")
     valuation_method: str = Field(..., description="評價方法: 'PER' (本益比) 或 'PBR' (股價淨值比)")
@@ -59,7 +74,7 @@ def _get_live_price(ticker_str: str | None) -> float | None:
 def _extract_summary_fields(data, live_price: float | None = None) -> tuple[str | None, str | None, str | None, dict]:
     """Gemini 可能回傳 Pydantic 物件（resp.parsed）或 dict（json.loads），統一取出欄位。"""
     if data is None:
-        return None, None, None, {}
+        return None, None, None, {"report_date": None}
     if isinstance(data, BaseModel):
         d = data.model_dump()
     elif isinstance(data, dict):
@@ -153,8 +168,9 @@ def _extract_summary_fields(data, live_price: float | None = None) -> tuple[str 
 """
     
     category = (d.get("category") or "").strip() or None
-    tickers = _normalize_tickers(d.get("ticker"))
-    
+    tickers = _format_ticker_column(d) or _normalize_tickers(d.get("ticker"))
+    report_date_iso = _parse_report_date_iso(d.get("report_date"))
+
     valuation_data = {
         "eps": eps,
         "pe_low": pe_low,
@@ -165,13 +181,11 @@ def _extract_summary_fields(data, live_price: float | None = None) -> tuple[str 
         "upside_high": upside_high,
         "rating_change": rating_change,
         "risk_tags": risk_tags,
-        "method": method
+        "method": method,
+        "report_date": report_date_iso,
     }
-        
+
     return summary, category, tickers, valuation_data
-
-
-from app.services.notion_service import create_notion_page
 
 
 def _extract_pdf_text(pdf_path: str) -> str:
@@ -200,6 +214,77 @@ def _normalize_tickers(value) -> str | None:
         items = [str(x).strip() for x in value if str(x).strip()]
         return ",".join(items) if items else None
     return str(value).strip() or None
+
+
+def _format_ticker_display_from_string(raw: str | None) -> str | None:
+    """正規化為『代號 名稱』，例如：2330 台積電。"""
+    if not raw or not str(raw).strip():
+        return None
+    s = re.sub(r"\s+", " ", str(raw).strip())
+    # 2330 台積電
+    m = re.match(r"^(\d{4,6})\s+(.+)$", s)
+    if m:
+        return f"{m.group(1)} {m.group(2).strip()}"
+    # 飛捷(6206)、環宇-KY(4991)
+    m = re.match(r"^(.+?)\s*[（(]\s*(\d{4,6})\s*[)）]\s*$", s)
+    if m:
+        name = re.sub(r"\s+", " ", m.group(1).strip())
+        code = m.group(2)
+        return f"{code} {name}"
+    # 8299 TT Phison
+    m = re.match(r"^(\d{4,6})\s+(?:TT|T\.?T\.?)\s+(.+)$", s, re.I)
+    if m:
+        return f"{m.group(1)} {m.group(2).strip()}"
+    # 僅數字代號
+    m = re.match(r"^(\d{4,6})$", s)
+    if m:
+        return m.group(1)
+    return s
+
+
+def _format_ticker_column(d: dict) -> str | None:
+    code = (d.get("stock_code") or "").strip()
+    name = (d.get("stock_name") or "").strip()
+    if code:
+        code_clean = "".join(ch for ch in code if ch.isdigit())[:6]
+        if len(code_clean) >= 4 and name:
+            return f"{code_clean} {name}"
+        if len(code_clean) >= 4:
+            rest = _format_ticker_display_from_string(d.get("ticker"))
+            if rest and rest.startswith(code_clean):
+                return rest
+            return code_clean
+    return _format_ticker_display_from_string(d.get("ticker"))
+
+
+def _parse_report_date_iso(s: str | None) -> str | None:
+    """轉成 Notion date 用的 YYYY-MM-DD。"""
+    if not s or not str(s).strip():
+        return None
+    s = str(s).strip()
+    for fmt in ("%Y/%m/%d", "%Y-%m-%d", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(s[:10], fmt).date().isoformat()
+        except ValueError:
+            continue
+    if re.fullmatch(r"\d{8}", s):
+        try:
+            return datetime.strptime(s, "%Y%m%d").date().isoformat()
+        except ValueError:
+            pass
+    m = re.match(r"(\d{4})\s*[/.\-年]\s*(\d{1,2})\s*[/.\-月]\s*(\d{1,2})", s)
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+        except ValueError:
+            pass
+    m = re.match(r"^(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})$", s)
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3))).isoformat()
+        except ValueError:
+            pass
+    return None
 
 
 async def process_report_file(report_id: int) -> None:
@@ -247,7 +332,9 @@ async def process_report_file(report_id: int) -> None:
                 "   - 如果是用 PER 估值，基礎數值請填入預估 EPS，倍數填入 P/E Ratio。\n"
                 "   - **關鍵**：倍數必須選取用來計算『目標價』的那一組（通常在報告開頭或評價單元），而非歷史平均區間。\n"
                 "4. **現價校對**：抓取報告中的收盤價，若有即時股價則由系統覆蓋。\n"
-                "5. ** JSON 欄位說明**：\n"
+                "5. **股票顯示**：`ticker` 必須為「台股代號 空格 中文簡稱」，例如 `2330 台積電`；並盡量填 `stock_code`（如 2330）與 `stock_name`（如 台積電）。\n"
+                "6. **報告日期**：`report_date` 填報告日，建議 YYYY/MM/DD 或 YYYY-MM-DD。\n"
+                "7. ** JSON 欄位說明**：\n"
                 "   - `eps_next_year`: 填入評價用的基礎數值 (EPS 或 BVPS)。\n"
                 "   - `pe_low` / `pe_high`: 填入評價用的倍數區間（若只有單一倍數，填在 high，low 設為 null）。\n"
                 "   - `target_low` / `target_high`: 直接抓取報告中的目標價數字（若只有單一目標價，填在 high）。"
@@ -279,15 +366,23 @@ async def process_report_file(report_id: int) -> None:
 
             data = await anyio.to_thread.run_sync(_call_gemini)
             
-            # 先提取代號以便抓取即時股價
+            # 先提取代號以便抓取即時股價（僅需數字代號）
             if isinstance(data, BaseModel):
-                raw_ticker = data.ticker
+                dump = data.model_dump()
             else:
-                raw_ticker = data.get("ticker")
-            tickers = _normalize_tickers(raw_ticker)
-            
+                dump = data if isinstance(data, dict) else {}
+            raw_ticker = dump.get("ticker")
+            code_hint = (dump.get("stock_code") or "").strip()
+            tickers_for_price = None
+            if code_hint:
+                digits = "".join(ch for ch in code_hint if ch.isdigit())
+                if len(digits) >= 4:
+                    tickers_for_price = digits
+            if not tickers_for_price:
+                tickers_for_price = _normalize_tickers(raw_ticker)
+
             # --- [新增] 獲取即時股價 ---
-            live_price = await anyio.to_thread.run_sync(_get_live_price, tickers)
+            live_price = await anyio.to_thread.run_sync(_get_live_price, tickers_for_price)
             
             summary, category, tickers, val_data = _extract_summary_fields(data, live_price=live_price)
 
@@ -305,13 +400,12 @@ async def process_report_file(report_id: int) -> None:
                 category=category,
                 summary=summary,
                 tickers=tickers,
-                # 傳遞數值欄位
+                report_date_iso=val_data.get("report_date"),
                 eps=val_data.get("eps"),
                 pe_low=val_data.get("pe_low"),
                 pe_high=val_data.get("pe_high"),
                 target_low=val_data.get("target_low"),
                 target_high=val_data.get("target_high"),
-                # 新增優化欄位
                 current_price=val_data.get("current_price"),
                 upside_high=val_data.get("upside_high"),
                 rating_change=val_data.get("rating_change"),

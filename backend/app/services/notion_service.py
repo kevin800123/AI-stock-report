@@ -71,6 +71,7 @@ async def create_notion_page(
     category: str | None,
     summary: str | None,
     tickers: str | None,
+    report_date_iso: str | None = None,
     # 數據欄位
     eps: float | None = None,
     pe_low: float | None = None,
@@ -89,8 +90,10 @@ async def create_notion_page(
 
     欄位名稱會依 Database schema 自動對應（標題 type=title；類別／代號依 rich_text、select 等）。
     若您的欄位名稱特殊，可在 backend/.env 設定：
-    NOTION_PROPERTY_TITLE、NOTION_PROPERTY_CATEGORY、NOTION_PROPERTY_TICKERS
-    等...
+    NOTION_PROPERTY_TITLE、NOTION_PROPERTY_CATEGORY、NOTION_PROPERTY_TICKERS、
+    NOTION_PROPERTY_REPORT_DATE
+    
+    「同股多篇排序」請在 Notion 資料表視圖：**依「股票代號」群組**，再依「報告日期」**遞減**排序（新報告在上）。
 
     回傳建立成功的 page_id。
     """
@@ -163,7 +166,13 @@ async def create_notion_page(
             db_updates["風險標籤"] = {"multi_select": {}}
         if not _resolve_field_key(props, "NOTION_PROPERTY_METHOD", ("評價方法", "Evaluation Method", "估值方式")):
             db_updates["評價方法"] = {"select": {}}
-        
+        if not _resolve_field_key(
+            props,
+            "NOTION_PROPERTY_REPORT_DATE",
+            ("報告日期", "Report Date", "report_date", "發布日期", "報告發布日期"),
+        ):
+            db_updates["報告日期"] = {"date": {}}
+
         if db_updates:
             database_obj = await anyio.to_thread.run_sync(
                 lambda: client.databases.update(database_id=notion_database_id, properties=db_updates)
@@ -241,6 +250,26 @@ async def create_notion_page(
     _add_prop("NOTION_PROPERTY_RATING", ("評等變動", "Rating", "評等"), rating_change, "select")
     _add_prop("NOTION_PROPERTY_RISK", ("風險標籤", "風險", "Risk Tags"), risk_tags, "multi_select")
     _add_prop("NOTION_PROPERTY_METHOD", ("評價方法", "Evaluation Method", "估值方式"), valuation_method, "select")
+
+    # 報告日期（優先填 Notion date；若欄位為文字則寫 ISO 字串）
+    if report_date_iso and str(report_date_iso).strip():
+        iso_start = str(report_date_iso).strip()[:10]
+        date_key = _resolve_field_key(
+            props,
+            "NOTION_PROPERTY_REPORT_DATE",
+            ("報告日期", "Report Date", "report_date", "發布日期", "報告發布日期"),
+        )
+        if date_key:
+            ptype = props[date_key].get("type")
+            if ptype == "date":
+                properties[date_key] = {"date": {"start": iso_start}}
+            else:
+                inner = _value_for_property_type(props[date_key], iso_start.replace("-", "/"))
+                if inner:
+                    properties[date_key] = inner
+        elif is_view:
+            dk = _env_prop("NOTION_PROPERTY_REPORT_DATE") or "報告日期"
+            properties[dk] = {"date": {"start": iso_start}}
 
     page = await anyio.to_thread.run_sync(
         lambda: client.pages.create(
