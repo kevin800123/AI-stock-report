@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { AlertCircle, CheckCircle2, FileUp, Loader2, RefreshCw, Trash2, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileUp, Loader2, RefreshCw, Trash2, XCircle, Zap } from 'lucide-react'
 
-import { deleteReport, getReports, uploadReport } from '../api.js'
+import { deleteReport, getReports, pingHealth, uploadReport } from '../api.js'
 
 function StatusBadge({ status }) {
   const s = (status || '').toLowerCase()
@@ -29,6 +29,10 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [hint, setHint] = useState('')
   const [deletingId, setDeletingId] = useState(null)
+  const [wakeBusy, setWakeBusy] = useState(false)
+  const [wakeLine, setWakeLine] = useState('')
+
+  const canWakeBackend = import.meta.env.DEV || !!import.meta.env.VITE_API_BASE_URL
 
   const fetchReports = useCallback(async () => {
     setLoading(true)
@@ -91,6 +95,22 @@ export default function Dashboard() {
     [fetchReports],
   )
 
+  const handleWakeBackend = useCallback(async () => {
+    if (!canWakeBackend) return
+    setWakeLine('')
+    setError('')
+    setWakeBusy(true)
+    try {
+      await pingHealth()
+      setWakeLine('後端已回應。若剛從休眠喚醒，後續操作會較順；冷啟動時此步驟仍可能需較久。')
+      await fetchReports()
+    } catch (e) {
+      setError(e?.response?.data?.detail || e?.message || '無法連線後端')
+    } finally {
+      setWakeBusy(false)
+    }
+  }, [canWakeBackend, fetchReports])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'application/pdf': ['.pdf'] },
@@ -136,15 +156,38 @@ export default function Dashboard() {
               拖曳 PDF 到下方或點擊選檔，上傳後將自動解析、AI 摘要並寫入 Notion（若已設定）。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={fetchReports}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            重新整理
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleWakeBackend}
+              disabled={!canWakeBackend || wakeBusy}
+              title={
+                canWakeBackend
+                  ? '先打一次健康檢查，喚醒休眠中的 Render 免費主機（第一次可能需 1～2 分鐘）'
+                  : '請先設定 VITE_API_BASE_URL 並重新部署'
+              }
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {wakeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+              叫醒後端
+            </button>
+            <button
+              type="button"
+              onClick={fetchReports}
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              重新整理
+            </button>
+          </div>
         </div>
+
+        {wakeLine ? (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-sky-500/10 px-3 py-2 text-sm text-sky-200 ring-1 ring-sky-500/20">
+            <Zap className="h-4 w-4 shrink-0" />
+            {wakeLine}
+          </div>
+        ) : null}
 
         <div
           {...getRootProps()}

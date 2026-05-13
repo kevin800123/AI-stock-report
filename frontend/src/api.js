@@ -35,5 +35,10 @@ export function getSettings() {
   return api.get('/settings/').then((r) => r.data)
 }
 
+/** 打 /health 觸發冷啟動中的後端開始喚醒（Render 免費方案休眠時很有用） */
+export function pingHealth() {
+  return api.get('/health').then((r) => r.data)
+}
+
 export default api
 
