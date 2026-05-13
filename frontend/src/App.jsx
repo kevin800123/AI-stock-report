@@ -60,11 +60,16 @@ function App() {
 
       <footer className="border-t border-zinc-800/60 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pt-8">
         <div className="mx-auto max-w-6xl break-words px-3 text-xs leading-relaxed text-zinc-500 sm:px-4">
-          <span className="text-zinc-500">API：</span>
-          <span className="break-all font-mono text-zinc-400">
-            {import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '（未設定 VITE_API_BASE_URL）')}
-          </span>
-          <span className="mt-1 block text-zinc-600 sm:mt-0 sm:inline"> ・ 前端輪詢每 5 秒更新狀態</span>
+          {import.meta.env.DEV ? (
+            <>
+              <span className="text-zinc-500">API：</span>
+              <span className="break-all font-mono text-zinc-400">
+                {import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'}
+              </span>
+              <span className="mt-1 block text-zinc-600 sm:mt-0 sm:inline"> ・ </span>
+            </>
+          ) : null}
+          <span className="text-zinc-600">前端輪詢每 5 秒更新狀態</span>
         </div>
       </footer>
     </div>
