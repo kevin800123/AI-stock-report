@@ -1,0 +1,58 @@
+# 將 React 前端建置後推到 gh-pages 分支（GitHub Pages 靜態託管）
+# 後端 FastAPI 無法跑在 Pages 上，請另外部署（Render / Railway / Fly.io 等），並設定 Secret：VITE_API_BASE_URL
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Compute Vite base path
+        id: vitebase
+        shell: bash
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ github.event.repository.name }}"
+          if [ "$REPO" = "${OWNER}.github.io" ]; then
+            echo "path=/" >> "$GITHUB_OUTPUT"
+            echo "Using root base (user/org Pages repo)"
+          else
+            echo "path=/${REPO}/" >> "$GITHUB_OUTPUT"
+            echo "Using project base: /${REPO}/"
+          fi
+
+      - name: Install and build
+        working-directory: frontend
+        env:
+          VITE_BASE: ${{ steps.vitebase.outputs.path }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: |
+          npm ci
+          npm run build
+          cp dist/index.html dist/404.html
+
+      - name: Push to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/dist

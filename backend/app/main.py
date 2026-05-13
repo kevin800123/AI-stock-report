@@ -10,7 +10,7 @@ from app.routers.settings import router as settings_router
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # 啟動時自動建表（SQLite）
+    # 啟動時自動建表（SQLite 或 DATABASE_URL 指定的 PostgreSQL）
     import app.models  # noqa: F401 — 註冊 ORM 至 metadata
 
     async with engine.begin() as conn:
@@ -27,8 +27,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"^http://localhost:\d+$",
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_origin_regex=r"^http://127\.0\.0\.1:\d+$|^http://localhost:\d+$|^https://[a-zA-Z0-9_.-]+\.github\.io$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

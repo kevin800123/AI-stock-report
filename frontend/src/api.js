@@ -1,7 +1,12 @@
 import axios from 'axios'
 
+// 本機開發：預設連 localhost。正式／GitHub Pages 建置時請設 VITE_API_BASE_URL（指向已上線的 FastAPI）
+const apiBase =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: apiBase,
   timeout: 30000,
 })
 

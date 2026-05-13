@@ -1,113 +1,105 @@
-# 投顧報告 AI 分析助理（全端專案）
+# 📈 投顧報告 AI 分析助理 (AI Investment Report Assistant)
 
-以 **React + FastAPI** 打造的全端工具：上傳投顧 PDF，後端解析文字後呼叫 **OpenAI** 產生摘要（強制 JSON 輸出），並可寫入 **Notion Database** 做集中管理。
+這是一個基於 **React + FastAPI** 打造的高級投資輔助工具，旨在將繁雜的 PDF 投顧報告自動化轉化為專業、結構化的 Notion 投資資料庫。
 
-## 系統架構
+## ✨ 核心特色
 
-- **前端**：React + Vite + Tailwind CSS
-  - 主要套件：axios、react-dropzone、lucide-react、react-router-dom
+- **🧠 雙模 AI 智慧解析**：整合 Google Gemini 2.0 Flash 尖端模型，自動辨識報告中的評價方法（PER 或 PBR），並精準萃取未來年度 (Forecast Year) 的關鍵估值數據。
+- **📊 即時行情聯動**：串接 `yfinance` API，自動抓取台灣股市最新成交價，計算最真實的「潛在漲幅」。
+- **📝 Notion 專業儀表板**：自動將摘要同步至 Notion 資料庫，支援自定義欄位如「評價倍數」、「預估目標價」、「風險標籤」等，實現個人化投顧回顧。
+- **🚀 專業估值邏輯**：
+    - **PER (本益比)**：自動對應預估 EPS 與 PE 倍數。
+    - **PBR (股價淨值比)**：自動對應每股淨值 (BVPS) 與 P/B 倍數，特別適合分析半導體、面板與金融類股。
+- **🔍 溯源驗證系統**：AI 會優先根據報告中的「目標價」反向溯源計算基礎，確保數據不再與報告打架。
+
+## 🛠️ 系統架構
+
+- **前端**：React + Vite + Tailwind CSS (使用 Lucide 圖標庫)
 - **後端**：Python FastAPI
-  - SQLAlchemy (async) + aiosqlite、PyMuPDF、OpenAI、Notion SDK、python-dotenv
-- **資料庫**：SQLite（`backend/data/app.db`）
+- **AI 核心**：Google Gemini 2.0 Flash API
+- **數據源**：Yahoo Finance (yfinance)
+- **同步終端**：Notion API (Official SDK)
+- **資料庫**：本機 SQLite；雲端建議 PostgreSQL（環境變數 `DATABASE_URL`）
 
-## 功能模組
-
-- **Dashboard**
-  - PDF 拖曳上傳
-  - 報告狀態列表（每 5 秒輪詢更新）
-- **摘要預覽**
-  - 顯示 `completed` 報告的摘要卡片（Badge：產業類別、股票代號）
-- **設定**
-  - 儲存 Notion Secret / Database ID
-  - 後端儲存時會測試 Notion 連線（失敗回 400）
-
-## 專案結構（重點）
+## 📂 專案結構
 
 ```
 AI投顧報告整理App/
-├── frontend/                         # React + Vite + Tailwind 前端
+├── frontend/                 # React 前端介面
 │   └── src/
-│       ├── api.js                    # axios API wrapper（指向 http://localhost:8000）
-│       ├── pages/
-│       │   ├── Dashboard.jsx
-│       │   ├── SummaryView.jsx
-│       │   └── Settings.jsx
-│       ├── App.jsx                   # Router + Layout
-│       └── main.jsx                  # BrowserRouter
-├── backend/                          # FastAPI 後端
+│       ├── pages/            # Dashboard, Summary, Settings
+│       └── api.js            # API 通訊模組
+├── backend/                  # FastAPI 後端服務
 │   ├── app/
-│   │   ├── main.py                   # FastAPI + CORS + lifespan 自動建表
-│   │   ├── database.py               # Async SQLite engine/session
-│   │   ├── models/                   # Report / Setting ORM
-│   │   ├── routers/                  # /reports /settings
-│   │   └── services/                 # report_processor / notion_service
-│   └── data/
-│       ├── app.db                    # SQLite DB
-│       └── reports/                  # 上傳 PDF 存放
-├── start_all.bat                     # Windows 一鍵啟動
-├── start_all.sh                      # macOS/Linux/Git Bash 一鍵啟動
+│   │   ├── services/         # 核心邏輯 (report_processor, notion_service)
+│   │   ├── models/           # 數據模型
+│   │   └── routers/          # API 路由
+│   └── data/                 # SQLite 資料庫與上傳檔案存放區
+├── render.yaml               # Render Blueprint（後端 Web Service）
+├── start_all.bat             # Windows 一鍵啟動腳本
 └── README.md
 ```
 
-## 本地啟動（建議先準備 .env）
+## 🚀 快速啟動
 
-後端在做 OpenAI 摘要時會讀取 `OPENAI_API_KEY`（也支援把 `openai_api_key` 存在 DB 的 settings）。
+### 1. 環境設定
+在 `backend/` 目錄下建立 `.env` 檔案，並填入以下資訊：
 
-在 `backend/` 建立 `.env`：
-
-```bash
-cd backend
-copy .env.example .env   # Windows
-# 或 cp .env.example .env # macOS/Linux
+```env
+GEMINI_API_KEY=您的Gemini金鑰
+NOTION_API_KEY=您的Notion金鑰
+NOTION_DATABASE_ID=您的Notion資料庫ID
+DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 ```
 
-並在 `backend/.env` 設定：
+### 2. 安裝與執行
+最簡單的方式是直接執行根目錄下的啟動腳本：
 
-```
-OPENAI_API_KEY=你的金鑰
-```
+- **Windows**: 點擊 `start_all.bat`
+- **macOS/Linux**: `bash start_all.sh`
 
-### 一鍵啟動（推薦）
+啟動後，瀏覽器會自動開啟前端介面（預設為 `http://localhost:5173`）。
 
-- **Windows**：
+## 📝 使用流程
 
-```bat
-start_all.bat
-```
+1. **設定金鑰**：至「系統設定」頁面確認 Notion 與 AI 金鑰已正確設定。
+2. **上傳報告**：在首頁將 PDF 報告拖入上傳區。
+3. **AI 分析**：系統會自動完成 `解析 PDF` -> `AI 摘要` -> `即時股價對比`。
+4. **自動同步**：完成後，摘要將自動推送到您的 Notion 資料庫中，並建立美觀的分析卡片。
 
-- **macOS / Linux / Git Bash**：
+## 🌐 部署到 GitHub Pages + Render（建議流程）
 
-```bash
-chmod +x start_all.sh
-./start_all.sh
-```
+整體順序：**先把後端上架 Render 並取得網址** → **再在 GitHub 設定 Secret 並觸發前端部署**。
 
-> 注意：Vite 若發現 `5173` 被占用會自動改用 `5174`；後端已允許 `localhost` 其他 port 的 CORS，以避免啟動卡住。
+### 一、後端：Render
 
-### 分開啟動
+1. 將程式推到 GitHub 後，至 [Render](https://dashboard.render.com) → **New** → **Blueprint**（或 **Web Service** 手動建立）。
+2. 若用 Blueprint：選擇此 repo，Render 會讀取根目錄 `render.yaml`。
+3. 在 Render 後台的 **Environment** 設定（Blueprint 會提示你填）：
+   - **`GEMINI_API_KEY`**、**`NOTION_API_KEY`**、**`NOTION_DATABASE_ID`**：與本機 `backend/.env` 相同。
+   - **`DATABASE_URL`（強烈建議）**：在 Render 建立 **PostgreSQL**，於資料庫頁複製 **Internal Database URL**（`postgresql://…`）貼到 Web Service 的環境變數。程式會自動改為 `postgresql+asyncpg://`。
+     - 若不設 `DATABASE_URL`，服務會退回容器內 SQLite，**免費方案重啟後資料可能消失**，僅適合試用。
+4. 部署完成後記下後端網址，例如 **`https://ai-invest-report-api.onrender.com`**。開啟 **`https://…/health`** 應回傳 `{"status":"ok"}`。
+   - 免費 Web 服務休眠後**第一次請求會較慢**，屬正常現象。
 
-後端（預設 `http://localhost:8000`）：
+### 二、前端：GitHub Pages
 
-```bash
-cd backend
-venv\Scripts\activate   # 或 source venv/bin/activate
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
+1. 在 GitHub Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**：
+   - 名稱：**`VITE_API_BASE_URL`**
+   - 值：**`https://你的服務.onrender.com`**（**不要**結尾 `/`，且建議 `https`）。
+2. 推送程式到 **`main`** 或 **`master`**（或到 **Actions** 手動執行 **Deploy to GitHub Pages**）。
+3. Repo → **Settings** → **Pages**：**Build and deployment** → **Deploy from a branch** → 選 **`gh-pages`**、資料夾 **`/(root)`**。
+4. 完成後前端網址為：**`https://<GitHub 使用者>.github.io/<儲存庫名稱>/`**  
+   若 repo 名為 **`<使用者>.github.io`**，workflow 會用根路徑，網址為 **`https://<使用者>.github.io/`**。
 
-前端（Vite 預設 `http://localhost:5173`，若占用會跳到 5174）：
+### 三、環境變數對照
 
-```bash
-cd frontend
-npm run dev
-```
+| 位置 | 變數 | 說明 |
+|------|------|------|
+| Render Web Service | `GEMINI_API_KEY`, `NOTION_*`, `DATABASE_URL` | 後端執行與持久化 |
+| GitHub Actions Secret | `VITE_API_BASE_URL` | 建置前端時寫入 API 根網址（指向 Render） |
 
-## API 文件
+後端已允許 **`https://*.github.io`** 的 CORS。
 
-- Swagger UI：`http://localhost:8000/docs`
-
-## 使用流程（最短路徑）
-
-1. 啟動前後端
-2. 到「設定」頁輸入 Notion Secret 與 Database ID（儲存時會測試連線）
-3. 到 Dashboard 上傳 PDF
-4. 等待狀態變成 `completed`，到「摘要預覽」查看摘要卡片
+---
+*本專案僅供學術與效率提升使用，投資有風險，報告數據僅供參考。*

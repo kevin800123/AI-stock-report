@@ -1,4 +1,5 @@
-"""SQLite 資料庫連線（檔案位於 backend/data/app.db）。"""
+"""資料庫連線：本機預設 SQLite；Render 等雲端請設定環境變數 DATABASE_URL（PostgreSQL）。"""
+import os
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,7 +11,25 @@ DATABASE_PATH = DATA_DIR / "app.db"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-DATABASE_URL = f"sqlite+aiosqlite:///{DATABASE_PATH.as_posix()}"
+
+def _resolve_database_url() -> str:
+    """
+    - 未設定 DATABASE_URL：使用本機 SQLite（backend/data/app.db）。
+    - Render / Neon 等：通常為 postgresql://…，改為 SQLAlchemy 非同步驅動 postgresql+asyncpg://。
+    """
+    url = (os.getenv("DATABASE_URL") or "").strip()
+    if not url:
+        return f"sqlite+aiosqlite:///{DATABASE_PATH.as_posix()}"
+    if url.startswith("postgresql+asyncpg://"):
+        return url
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+asyncpg://", 1)
+    return url
+
+
+DATABASE_URL = _resolve_database_url()
 
 engine = create_async_engine(
     DATABASE_URL,

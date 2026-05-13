@@ -1,0 +1,28 @@
+# Render Blueprint：在 Render Dashboard → New → Blueprint → 連結此 repo 即可建立 Web Service
+# 建議另外建立 PostgreSQL，並將 Internal Database URL 貼到下方 DATABASE_URL（或於 Dashboard 手動新增變數）
+# 未設定 DATABASE_URL 時，程式會退回本機式 SQLite（在 Render 上重啟可能遺失資料，僅適合試跑）
+
+version: "1"
+
+services:
+  - type: web
+    name: ai-invest-report-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      # 以下請在 Render「環境變數」填入實際值，勿將金鑰提交到 Git
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NOTION_API_KEY
+        sync: false
+      - key: NOTION_DATABASE_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
