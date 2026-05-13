@@ -126,37 +126,37 @@ export default function Dashboard() {
   }, [reports])
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-sm">
-          <div className="text-xs text-zinc-400">總報告</div>
-          <div className="mt-1 text-2xl font-semibold">{stats.total}</div>
+    <div className="space-y-5 sm:space-y-6">
+      <section className="grid grid-cols-3 gap-2 sm:gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-3 shadow-sm sm:p-5">
+          <div className="text-[11px] text-zinc-400 sm:text-xs">總報告</div>
+          <div className="mt-0.5 text-xl font-semibold tabular-nums sm:mt-1 sm:text-2xl">{stats.total}</div>
         </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-sm">
-          <div className="text-xs text-zinc-400">已完成</div>
-          <div className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-3 shadow-sm sm:p-5">
+          <div className="text-[11px] text-zinc-400 sm:text-xs">已完成</div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums sm:mt-1 sm:gap-2 sm:text-2xl">
             <span>{stats.completed}</span>
-            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 sm:h-5 sm:w-5" />
           </div>
         </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-sm">
-          <div className="text-xs text-zinc-400">錯誤</div>
-          <div className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-3 shadow-sm sm:p-5">
+          <div className="text-[11px] text-zinc-400 sm:text-xs">錯誤</div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums sm:mt-1 sm:gap-2 sm:text-2xl">
             <span>{stats.errorCount}</span>
-            <XCircle className="h-5 w-5 text-red-400" />
+            <XCircle className="h-4 w-4 shrink-0 text-red-400 sm:h-5 sm:w-5" />
           </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h2 className="text-base font-semibold">上傳投顧報告（PDF）</h2>
-            <p className="mt-1 text-sm text-zinc-400">
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">
               拖曳 PDF 到下方或點擊選檔，上傳後將自動解析、AI 摘要並寫入 Notion（若已設定）。
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             <button
               type="button"
               onClick={handleWakeBackend}
@@ -166,7 +166,7 @@ export default function Dashboard() {
                   ? '先打一次健康檢查，喚醒休眠中的 Render 免費主機（第一次可能需 1～2 分鐘）'
                   : '請先設定 VITE_API_BASE_URL 並重新部署'
               }
-              className="inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-[44px] touch-manipulation items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100 hover:bg-amber-500/15 active:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-0"
             >
               {wakeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
               叫醒後端
@@ -174,7 +174,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={fetchReports}
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+              className="inline-flex min-h-[44px] touch-manipulation items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-900 active:bg-zinc-800 sm:w-auto"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               重新整理
@@ -183,125 +183,179 @@ export default function Dashboard() {
         </div>
 
         {wakeLine ? (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-sky-500/10 px-3 py-2 text-sm text-sky-200 ring-1 ring-sky-500/20">
-            <Zap className="h-4 w-4 shrink-0" />
-            {wakeLine}
+          <div className="mt-3 flex w-full max-w-full items-start gap-2 rounded-xl bg-sky-500/10 px-3 py-2.5 text-sm leading-relaxed text-sky-200 ring-1 ring-sky-500/20">
+            <Zap className="h-4 w-4 shrink-0 pt-0.5" />
+            <span className="min-w-0 break-words">{wakeLine}</span>
           </div>
         ) : null}
 
         <div
           {...getRootProps()}
-          className={`mt-5 cursor-pointer rounded-2xl border border-dashed p-8 text-center transition ${
+          className={`mt-4 touch-manipulation cursor-pointer rounded-2xl border border-dashed p-6 text-center transition sm:mt-5 sm:p-8 ${
             isDragActive
               ? 'border-indigo-400/60 bg-indigo-500/10'
-              : 'border-zinc-700/70 bg-zinc-950/30 hover:bg-zinc-950/50'
+              : 'border-zinc-700/70 bg-zinc-950/30 active:bg-zinc-950/50 sm:hover:bg-zinc-950/50'
           } ${uploading ? 'cursor-not-allowed opacity-70' : ''}`}
         >
           <input {...getInputProps()} />
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/25">
             {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileUp className="h-6 w-6" />}
           </div>
-          <div className="mt-4 text-sm">
+          <div className="mt-3 text-sm sm:mt-4">
             {uploading ? (
               <span className="text-zinc-200">上傳中...</span>
             ) : isDragActive ? (
               <span className="text-indigo-200">放開以開始上傳</span>
             ) : (
-              <span className="text-zinc-200">拖曳 PDF 到此處，或點擊選擇檔案</span>
+              <span className="text-zinc-200">點擊選擇 PDF（手機可由此挑檔）</span>
             )}
           </div>
+          <div className="mt-1 hidden text-xs text-zinc-500 sm:block">亦支援拖曳 PDF 到此處</div>
           <div className="mt-1 text-xs text-zinc-500">僅支援 .pdf，單檔上傳</div>
         </div>
 
         {hint ? (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 ring-1 ring-emerald-500/20">
-            <CheckCircle2 className="h-4 w-4" />
-            {hint}
+          <div className="mt-3 flex w-full max-w-full items-start gap-2 rounded-xl bg-emerald-500/10 px-3 py-2.5 text-sm leading-relaxed text-emerald-200 ring-1 ring-emerald-500/20 sm:mt-4">
+            <CheckCircle2 className="h-4 w-4 shrink-0 pt-0.5" />
+            <span className="min-w-0 break-words">{hint}</span>
           </div>
         ) : null}
 
         {error ? (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-500/20">
-            <AlertCircle className="h-4 w-4" />
-            {error}
+          <div className="mt-3 flex w-full max-w-full items-start gap-2 rounded-xl bg-red-500/10 px-3 py-2.5 text-sm leading-relaxed text-red-200 ring-1 ring-red-500/20 sm:mt-4">
+            <AlertCircle className="h-4 w-4 shrink-0 pt-0.5" />
+            <span className="min-w-0 break-words">{error}</span>
           </div>
         ) : null}
       </section>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-1 gap-y-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold">報告列表</h2>
           <div className="text-xs text-zinc-500">每 5 秒自動更新狀態</div>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-950/40 text-xs text-zinc-400">
-              <tr>
-                <th className="px-4 py-3 font-medium">檔名</th>
-                <th className="px-4 py-3 font-medium">狀態</th>
-                <th className="px-4 py-3 font-medium">類別</th>
-                <th className="px-4 py-3 font-medium">股票代號</th>
-                <th className="px-4 py-3 font-medium">時間</th>
-                <th className="px-4 py-3 font-medium text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {reports.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-6 text-center text-zinc-500" colSpan={6}>
-                    尚無報告，先上傳一份 PDF 吧。
-                  </td>
-                </tr>
-              ) : (
-                reports.map((r) => (
-                  <tr key={r.id} className="bg-zinc-900/10">
-                    <td className="px-4 py-3 max-w-[200px] sm:max-w-[300px] md:max-w-[400px]">
-                      <div className="flex items-start gap-2">
-                        <FileUp className="h-4 w-4 shrink-0 text-zinc-500 mt-0.5" />
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-zinc-100">{r.original_filename}</div>
-                          {r.error_message ? (
-                            <div className="mt-1 whitespace-normal break-words text-xs text-red-300">
-                              {r.error_message}
-                            </div>
-                          ) : null}
-                        </div>
+        {reports.length === 0 ? (
+          <div className="mt-4 rounded-2xl border border-zinc-800 py-10 text-center text-sm text-zinc-500">
+            尚無報告，先上傳一份 PDF 吧。
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 space-y-3 md:hidden">
+              {reports.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                      <FileUp className="h-4 w-4 shrink-0 text-zinc-500" />
+                      <div className="min-w-0">
+                        <div className="break-words font-medium text-zinc-100">{r.original_filename}</div>
+                        {r.error_message ? (
+                          <div className="mt-2 break-words text-xs text-red-300">{r.error_message}</div>
+                        ) : null}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={r.status} />
-                    </td>
-                    <td className="px-4 py-3 text-zinc-300">{r.category || '-'}</td>
-                    <td className="px-4 py-3 text-zinc-300">{r.stock_tickers || '-'}</td>
-                    <td className="px-4 py-3 text-zinc-500">
-                      {r.created_at ? new Date(r.created_at).toLocaleString() : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(r)}
-                        disabled={deletingId === r.id}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        title="刪除此報告"
-                      >
-                        {deletingId === r.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                        )}
-                        刪除
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-zinc-400">
+                    <div>
+                      <span className="text-zinc-600">類別</span>
+                      <div className="mt-0.5 text-zinc-300">{r.category || '-'}</div>
+                    </div>
+                    <div>
+                      <span className="text-zinc-600">代號</span>
+                      <div className="mt-0.5 break-all text-zinc-300">{r.stock_tickers || '-'}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-zinc-600">時間</span>
+                      <div className="mt-0.5 text-zinc-500">
+                        {r.created_at ? new Date(r.created_at).toLocaleString() : '-'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(r)}
+                      disabled={deletingId === r.id}
+                      className="inline-flex min-h-[44px] min-w-[88px] touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200 hover:bg-red-500/20 active:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deletingId === r.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-        <div className="mt-3 text-xs text-zinc-500">
-          狀態含意：Parsing（解析 PDF）、Summarizing（AI 摘要）、Notion（寫入中）、Completed（完成）、Error（失敗）。
+            <div className="mt-4 hidden overflow-x-auto rounded-2xl border border-zinc-800 md:block">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="bg-zinc-950/40 text-xs text-zinc-400">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">檔名</th>
+                    <th className="px-4 py-3 font-medium">狀態</th>
+                    <th className="px-4 py-3 font-medium">類別</th>
+                    <th className="px-4 py-3 font-medium">股票代號</th>
+                    <th className="px-4 py-3 font-medium">時間</th>
+                    <th className="px-4 py-3 font-medium text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800">
+                  {reports.map((r) => (
+                    <tr key={r.id} className="bg-zinc-900/10">
+                      <td className="max-w-[12rem] px-4 py-3 lg:max-w-[18rem] xl:max-w-md">
+                        <div className="flex items-start gap-2">
+                          <FileUp className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
+                          <div className="min-w-0">
+                            <div className="font-medium text-zinc-100">{r.original_filename}</div>
+                            {r.error_message ? (
+                              <div className="mt-1 whitespace-normal break-words text-xs text-red-300">
+                                {r.error_message}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="px-4 py-3 text-zinc-300">{r.category || '-'}</td>
+                      <td className="break-all px-4 py-3 text-zinc-300">{r.stock_tickers || '-'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-zinc-500">
+                        {r.created_at ? new Date(r.created_at).toLocaleString() : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(r)}
+                          disabled={deletingId === r.id}
+                          className="inline-flex min-h-[36px] touch-manipulation items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="刪除此報告"
+                        >
+                          {deletingId === r.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          刪除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <div className="mt-3 text-xs leading-relaxed text-zinc-500">
+          狀態：Parsing（解析）→ Summarizing（AI）→ Notion → Completed；Error（失敗）。
         </div>
       </section>
     </div>
