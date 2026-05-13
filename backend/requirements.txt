@@ -9,3 +9,4 @@ python-dotenv
 notion-client
 pydantic
 google-genai
+yfinance

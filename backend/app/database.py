@@ -29,11 +29,24 @@ def _resolve_database_url() -> str:
     return url
 
 
+def _engine_kwargs(db_url: str) -> dict:
+    """Render 上 Postgres 通常需要 TLS；asyncpg 需明確 ssl。"""
+    if db_url.startswith("sqlite"):
+        return {}
+    if os.getenv("RENDER", "").lower() != "true":
+        return {}
+    # 由 Dashboard 貼上的 External URL 幾乎都帶 sslmode=require；避免與 connect_args 衝突可二選一
+    if "sslmode=" in db_url.lower():
+        return {}
+    return {"connect_args": {"ssl": True}}
+
+
 DATABASE_URL = _resolve_database_url()
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
+    **_engine_kwargs(DATABASE_URL),
 )
 
 AsyncSessionLocal = async_sessionmaker(

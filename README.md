@@ -101,5 +101,12 @@ DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 
 後端已允許 **`https://*.github.io`** 的 CORS。
 
+### 四、Render 部署失敗（Exited with status 1）
+
+常見原因：
+
+1. **缺少依賴**：請確認 `requirements.txt` 含 `yfinance`（報告處理會 `import yfinance`）。若日誌為 `ModuleNotFoundError: No module named 'yfinance'`，拉最新程式後重新部署。
+2. **PostgreSQL 連不上**：確認 Web Service 的 **`DATABASE_URL`** 為同一帳號 Postgres 的 **Internal**，或 External URL 且可從網路連線；必要時檢查 Render 該次 deploy 的 **Logs** 內 `asyncpg` / `connection refused` 訊息。
+
 ---
 *本專案僅供學術與效率提升使用，投資有風險，報告數據僅供參考。*
