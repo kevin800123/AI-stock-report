@@ -5,9 +5,12 @@ const apiBase =
   import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')
 
+// Render 免費方案冷啟動常超過 30s，正式站預設 120s；本機維持 30s。可建置變數 VITE_API_TIMEOUT_MS 覆寫。
+const requestTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS) || (import.meta.env.DEV ? 30000 : 120000)
+
 const api = axios.create({
   baseURL: apiBase,
-  timeout: 30000,
+  timeout: requestTimeout,
 })
 
 export function getReports() {
