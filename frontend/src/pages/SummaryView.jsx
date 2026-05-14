@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BadgeCheck, FileText, RefreshCw, Tag } from 'lucide-react'
+import { BadgeCheck, ExternalLink, FileText, RefreshCw, Tag } from 'lucide-react'
 
 import { getReports } from '../api.js'
+
+/** 使用者 Notion 資料庫／頁面（僅前端導向，不經後端代理） */
+const NOTION_INDEX_URL =
+  'https://www.notion.so/35f4a360157f80368f47e9fe6419d6e9?v=35f4a360157f805f9c1e000c11b3bbef&source=copy_link'
 
 function Badge({ children, tone = 'zinc' }) {
   const tones = {
@@ -57,14 +61,25 @@ export default function SummaryView() {
               只顯示狀態為 <span className="font-semibold text-zinc-200">completed</span> 的報告。
             </p>
           </div>
-          <button
-            type="button"
-            onClick={fetchReports}
-            className="inline-flex min-h-[44px] w-full shrink-0 touch-manipulation items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-900 active:bg-zinc-800 sm:w-auto"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            重新整理
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch sm:gap-2">
+            <a
+              href={NOTION_INDEX_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[44px] w-full shrink-0 touch-manipulation items-center justify-center gap-2 rounded-xl border border-indigo-500/35 bg-indigo-500/10 px-3 py-2.5 text-sm text-indigo-200 ring-1 ring-indigo-400/20 hover:bg-indigo-500/15 active:bg-indigo-500/20 sm:w-auto"
+            >
+              <ExternalLink className="h-4 w-4 shrink-0" />
+              開啟 Notion
+            </a>
+            <button
+              type="button"
+              onClick={fetchReports}
+              className="inline-flex min-h-[44px] w-full shrink-0 touch-manipulation items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-900 active:bg-zinc-800 sm:w-auto"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              重新整理
+            </button>
+          </div>
         </div>
 
         {error ? <div className="mt-4 break-words text-sm text-red-300">{error}</div> : null}
