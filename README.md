@@ -78,6 +78,7 @@ DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 2. **上傳**：Dashboard 上傳 PDF；**Render 免費方案休眠**時可先按 **「叫醒後端」**（呼叫 `/health`）再操作。
 3. **流程**：解析 PDF → AI 摘要 →（可選）寫入 Notion。
 4. **摘要預覽**：completed 的報告可在「摘要預覽」檢視；可按 **開啟 Notion** 跳到你在程式中設定的 Notion 頁面，與後端同步寫入的資料庫分開設定亦可。
+5. **UX**：相同 PDF（SHA-256）若已分析完成會回傳 409 拒絕重複上傳；前端僅在有報告處理中時每 5 秒輪詢更新列表。
 
 ## 📓 Notion 資料庫：報告日期與同股排序
 

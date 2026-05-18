@@ -15,6 +15,34 @@ os.environ.setdefault("REQUIRE_UPLOAD_API_KEY", "true")
 os.environ.setdefault("UPLOAD_MAX_BYTES", str(10 * 1024 * 1024))
 
 
+def _ensure_reports_sha256_column():
+    import asyncio
+
+    from sqlalchemy import text
+
+    from app.database import engine
+
+    async def _run():
+        async with engine.begin() as conn:
+            rows = await conn.execute(text("PRAGMA table_info(reports)"))
+            cols = {r[1] for r in rows.fetchall()}
+            if "content_sha256" not in cols:
+                await conn.execute(
+                    text("ALTER TABLE reports ADD COLUMN content_sha256 VARCHAR(64)")
+                )
+                await conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_reports_content_sha256 "
+                        "ON reports (content_sha256)"
+                    )
+                )
+
+    asyncio.run(_run())
+
+
+_ensure_reports_sha256_column()
+
+
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient

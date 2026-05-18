@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { BadgeCheck, ExternalLink, FileText, RefreshCw, Tag } from 'lucide-react'
 
-import { getReports } from '../api.js'
+import { useReportsPolling } from '../hooks/useReportsPolling.js'
+import { formatReportErrorMessage } from '../utils/reportStatus.js'
 
 /** 使用者 Notion 資料庫／頁面（僅前端導向，不經後端代理） */
 const NOTION_INDEX_URL =
@@ -22,29 +23,7 @@ function Badge({ children, tone = 'zinc' }) {
 }
 
 export default function SummaryView() {
-  const [reports, setReports] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function fetchReports() {
-    setLoading(true)
-    try {
-      const data = await getReports()
-      setReports(data || [])
-      setError('')
-    } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || '無法取得報告列表')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      fetchReports()
-    }, 0)
-    return () => clearTimeout(t)
-  }, [])
+  const { reports, loading, error, refresh } = useReportsPolling()
 
   const completed = useMemo(
     () => reports.filter((r) => (r.status || '').toLowerCase() === 'completed'),
@@ -73,7 +52,7 @@ export default function SummaryView() {
             </a>
             <button
               type="button"
-              onClick={fetchReports}
+              onClick={refresh}
               className="inline-flex min-h-[44px] w-full shrink-0 touch-manipulation items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-900 active:bg-zinc-800 sm:w-auto"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -86,7 +65,24 @@ export default function SummaryView() {
       </section>
 
       <section className="grid gap-3 sm:gap-4 md:grid-cols-2">
-        {completed.length === 0 ? (
+        {loading && reports.length === 0 ? (
+          <>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-sm sm:p-6"
+              >
+                <div className="h-4 w-1/3 rounded bg-zinc-800" />
+                <div className="mt-4 h-6 w-2/3 rounded bg-zinc-800" />
+                <div className="mt-4 space-y-2">
+                  <div className="h-3 w-full rounded bg-zinc-800/80" />
+                  <div className="h-3 w-5/6 rounded bg-zinc-800/80" />
+                  <div className="h-3 w-4/6 rounded bg-zinc-800/80" />
+                </div>
+              </div>
+            ))}
+          </>
+        ) : completed.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 text-center text-sm leading-relaxed text-zinc-400 shadow-sm sm:p-8 md:col-span-2">
             目前沒有已完成的摘要。請先到 Dashboard 上傳 PDF。
           </div>
@@ -125,7 +121,7 @@ export default function SummaryView() {
                 {r.summary || '（尚無摘要內容）'}
               </div>
 
-              {r.error_message ? <div className="mt-4 break-words text-sm text-red-300">{r.error_message}</div> : null}
+              {r.error_message ? <div className="mt-4 break-words text-sm text-red-300">{formatReportErrorMessage(r.error_message)}</div> : null}
 
               <div className="mt-5 text-xs leading-relaxed text-zinc-500">
                 {r.created_at ? <span className="block sm:inline">建立時間：{new Date(r.created_at).toLocaleString()}</span> : null}

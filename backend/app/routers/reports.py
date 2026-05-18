@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from uuid import uuid4
 
@@ -42,12 +43,29 @@ async def upload_report(
     content = await read_upload_with_limits(file, request)
     assert_pdf_content(content)
 
+    digest = hashlib.sha256(content).hexdigest()
+    existing = await session.execute(
+        select(Report)
+        .where(Report.content_sha256 == digest)
+        .order_by(Report.created_at.desc())
+    )
+    row = existing.scalars().first()
+    if row:
+        if row.status in ("parsing", "summarizing", "writing_notion", "uploading"):
+            raise HTTPException(status_code=409, detail="此 PDF 正在處理中，請稍後再查看列表")
+        if row.status == "completed":
+            raise HTTPException(
+                status_code=409,
+                detail=f"此報告已分析過（{row.original_filename}）",
+            )
+
     file_id = uuid4().hex
     storage_path = REPORTS_DIR / f"{file_id}.pdf"
     storage_path.write_bytes(content)
 
     report = Report(
         original_filename=file.filename,
+        content_sha256=digest,
         storage_path=str(storage_path),
         status="parsing",
     )

@@ -13,6 +13,7 @@ class Report(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     status: Mapped[str] = mapped_column(
         String(64),

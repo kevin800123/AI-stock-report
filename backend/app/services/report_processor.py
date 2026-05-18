@@ -209,6 +209,45 @@ def _extract_pdf_text(pdf_path: str) -> str:
         doc.close()
 
 
+def _user_facing_error(exc: Exception) -> str:
+    msg = str(exc).strip()
+    lower = msg.lower()
+    if any(
+        k in lower
+        for k in (
+            "gemini_api_key",
+            "notion_api",
+            "notion_database",
+            "api key",
+            "api_key",
+            ".env",
+            "尚未設定",
+            "not configured",
+        )
+    ):
+        return "服務尚未設定完成，請聯絡管理員或稍後再試"
+    if any(
+        k in lower
+        for k in (
+            "connection",
+            "timeout",
+            "timed out",
+            "network",
+            "503",
+            "502",
+            "429",
+            "rate limit",
+            "unavailable",
+        )
+    ) or type(exc).__name__ in ("ConnectionError", "TimeoutError"):
+        return "外部服務暫時無法連線，請稍後重試"
+    if "pdf" in lower and any(k in lower for k in ("無文字", "無法解析", "no text", "empty")):
+        return "無法讀取 PDF 內容，請確認檔案是否損壞"
+    if any(k in lower for k in ("filenotfound", "找不到檔案", "no such file")):
+        return "找不到報告檔案，請重新上傳"
+    return "處理失敗，請稍後重試或重新上傳"
+
+
 def _safe_unlink_pdf(path: str | None) -> None:
     if not path:
         return
@@ -434,6 +473,6 @@ async def process_report_file(report_id: int) -> None:
         except Exception as e:
             logger.exception("process_report_file failed report_id=%s", report_id)
             report.status = "error"
-            report.error_message = str(e)
+            report.error_message = _user_facing_error(e)
             await session.commit()
 

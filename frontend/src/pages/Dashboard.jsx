@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { AlertCircle, CheckCircle2, FileUp, Loader2, RefreshCw, Trash2, XCircle, Zap } from 'lucide-react'
 
-import { deleteReport, getReports, pingHealth, uploadReport } from '../api.js'
+import ReportProgressHint from '../components/ReportProgressHint.jsx'
+import { useBackendWakeContext } from '../context/BackendWakeContext.jsx'
+import { useReportsPolling } from '../hooks/useReportsPolling.js'
+import { deleteReport, uploadReport } from '../api.js'
+import { formatApiError } from '../utils/apiErrors.js'
+import { formatReportErrorMessage, hasProcessingReports } from '../utils/reportStatus.js'
 import { getUploadSizeError, UPLOAD_MAX_BYTES, uploadMaxSizeLabel } from '../uploadLimits.js'
 
 function StatusBadge({ status }) {
@@ -24,40 +29,21 @@ function StatusBadge({ status }) {
 }
 
 export default function Dashboard() {
-  const [reports, setReports] = useState([])
-  const [loading, setLoading] = useState(false)
+  const { reports, loading, error: pollError, refresh, isPolling, fetchReports } = useReportsPolling()
+  const { canWakeBackend, wakeBusy, wakeLine, handleWakeBackend } = useBackendWakeContext()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [hint, setHint] = useState('')
   const [deletingId, setDeletingId] = useState(null)
-  const [wakeBusy, setWakeBusy] = useState(false)
-  const [wakeLine, setWakeLine] = useState('')
+  const [tick, setTick] = useState(0)
 
-  const canWakeBackend = import.meta.env.DEV || !!import.meta.env.VITE_API_BASE_URL
-
-  const fetchReports = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await getReports()
-      setReports(data || [])
-      setError('')
-    } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || '無法取得報告列表')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const displayError = error || pollError
 
   useEffect(() => {
-    const init = setTimeout(() => {
-      fetchReports()
-    }, 0)
-    const t = setInterval(fetchReports, 5000)
-    return () => {
-      clearTimeout(init)
-      clearInterval(t)
-    }
-  }, [fetchReports])
+    if (!hasProcessingReports(reports)) return undefined
+    const id = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [reports])
 
   const onDrop = useCallback(
     async (acceptedFiles) => {
@@ -75,9 +61,9 @@ export default function Dashboard() {
       try {
         await uploadReport(file)
         setHint('已上傳，正在背景解析與摘要中...')
-        await fetchReports()
+        await fetchReports({ silent: true })
       } catch (e) {
-        setError(e?.response?.data?.detail || e?.message || '上傳失敗')
+        setError(formatApiError(e))
       } finally {
         setUploading(false)
       }
@@ -93,9 +79,9 @@ export default function Dashboard() {
       setError('')
       try {
         await deleteReport(r.id)
-        await fetchReports()
+        await fetchReports({ silent: true })
       } catch (e) {
-        setError(e?.response?.data?.detail || e?.message || '刪除失敗')
+        setError(formatApiError(e))
       } finally {
         setDeletingId(null)
       }
@@ -103,21 +89,14 @@ export default function Dashboard() {
     [fetchReports],
   )
 
-  const handleWakeBackend = useCallback(async () => {
-    if (!canWakeBackend) return
-    setWakeLine('')
+  const onWakeClick = useCallback(async () => {
     setError('')
-    setWakeBusy(true)
     try {
-      await pingHealth()
-      setWakeLine('後端已回應。若剛從休眠喚醒，後續操作會較順；冷啟動時此步驟仍可能需較久。')
-      await fetchReports()
+      await handleWakeBackend()
     } catch (e) {
-      setError(e?.response?.data?.detail || e?.message || '無法連線後端')
-    } finally {
-      setWakeBusy(false)
+      setError(formatApiError(e))
     }
-  }, [canWakeBackend, fetchReports])
+  }, [handleWakeBackend])
 
   const onDropRejected = useCallback((rejections) => {
     const tooLarge = rejections.some((r) =>
@@ -182,7 +161,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             <button
               type="button"
-              onClick={handleWakeBackend}
+              onClick={onWakeClick}
               disabled={!canWakeBackend || wakeBusy}
               title={
                 canWakeBackend
@@ -196,7 +175,7 @@ export default function Dashboard() {
             </button>
             <button
               type="button"
-              onClick={fetchReports}
+              onClick={refresh}
               className="inline-flex min-h-[44px] touch-manipulation items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 hover:bg-zinc-900 active:bg-zinc-800 sm:w-auto"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -247,7 +226,7 @@ export default function Dashboard() {
         {error ? (
           <div className="mt-3 flex w-full max-w-full items-start gap-2 rounded-xl bg-red-500/10 px-3 py-2.5 text-sm leading-relaxed text-red-200 ring-1 ring-red-500/20 sm:mt-4">
             <AlertCircle className="h-4 w-4 shrink-0 pt-0.5" />
-            <span className="min-w-0 break-words">{error}</span>
+            <span className="min-w-0 break-words">{displayError}</span>
           </div>
         ) : null}
       </section>
@@ -255,7 +234,9 @@ export default function Dashboard() {
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 shadow-sm sm:p-6">
         <div className="flex flex-col gap-1 gap-y-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold">報告列表</h2>
-          <div className="text-xs text-zinc-500">每 5 秒自動更新狀態</div>
+          <div className="text-xs text-zinc-500">
+            {isPolling ? '處理中：每 5 秒自動更新' : '全部完成，已停止自動更新'}
+          </div>
         </div>
 
         {reports.length === 0 ? (
@@ -275,8 +256,9 @@ export default function Dashboard() {
                       <FileUp className="h-4 w-4 shrink-0 text-zinc-500" />
                       <div className="min-w-0">
                         <div className="break-words font-medium text-zinc-100">{r.original_filename}</div>
+                        <ReportProgressHint report={r} tick={tick} />
                         {r.error_message ? (
-                          <div className="mt-2 break-words text-xs text-red-300">{r.error_message}</div>
+                          <div className="mt-2 break-words text-xs text-red-300">{formatReportErrorMessage(r.error_message)}</div>
                         ) : null}
                       </div>
                     </div>
@@ -337,16 +319,20 @@ export default function Dashboard() {
                           <FileUp className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
                           <div className="min-w-0">
                             <div className="font-medium text-zinc-100">{r.original_filename}</div>
+                            <ReportProgressHint report={r} tick={tick} />
                             {r.error_message ? (
                               <div className="mt-1 whitespace-normal break-words text-xs text-red-300">
-                                {r.error_message}
+                                {formatReportErrorMessage(r.error_message)}
                               </div>
                             ) : null}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={r.status} />
+                        <div className="space-y-1">
+                          <StatusBadge status={r.status} />
+                          <ReportProgressHint report={r} tick={tick} />
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-zinc-300">{r.category || '-'}</td>
                       <td className="break-all px-4 py-3 text-zinc-300">{r.stock_tickers || '-'}</td>
