@@ -7,6 +7,9 @@ from slowapi.errors import RateLimitExceeded
 
 from app.database import Base, engine
 from app.deps.security import limiter
+from app.logging_config import setup_logging
+
+setup_logging()
 from app.routers.reports import router as reports_router
 from app.routers.settings import router as settings_router
 

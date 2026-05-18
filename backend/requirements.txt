@@ -11,3 +11,6 @@ pydantic
 google-genai
 yfinance
 slowapi
+tenacity
+pytest
+httpx

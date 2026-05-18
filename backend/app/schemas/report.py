@@ -1,6 +1,6 @@
 """報告相關 Pydantic Schema。
 
-API Response 僅反映資料表欄位；機密請勿存入 Report（Notion Secret 應仅存於 Setting）。
+API Response 不含內部路徑；機密請勿存入 Report。
 """
 
 from datetime import datetime
@@ -49,7 +49,6 @@ class ReportResponse(BaseModel):
 
     id: int
     original_filename: str
-    storage_path: str
     status: str
     summary: str | None
     category: str | None

@@ -8,6 +8,12 @@ from dotenv import load_dotenv
 from notion_client import Client
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.utils.retry import call_with_sync_retry
+
+
+async def _run_notion_sync(fn):
+    return await anyio.to_thread.run_sync(lambda: call_with_sync_retry(fn))
+
 
 def _props_map(database_obj: dict) -> dict:
     return (database_obj or {}).get("properties") or {}
@@ -107,7 +113,7 @@ async def create_notion_page(
 
     client = Client(auth=notion_secret)
 
-    database_obj = await anyio.to_thread.run_sync(
+    database_obj = await _run_notion_sync(
         lambda: client.databases.retrieve(database_id=notion_database_id)
     )
     props = _props_map(database_obj)
@@ -121,7 +127,7 @@ async def create_notion_page(
             source_db_id = database_obj["data_sources"][0].get("id")
             if source_db_id:
                 # 試著讀取原始資料庫的結構
-                source_db_obj = await anyio.to_thread.run_sync(
+                source_db_obj = await _run_notion_sync(
                     lambda: client.databases.retrieve(database_id=source_db_id)
                 )
                 source_props = _props_map(source_db_obj)
@@ -174,7 +180,7 @@ async def create_notion_page(
             db_updates["報告日期"] = {"date": {}}
 
         if db_updates:
-            database_obj = await anyio.to_thread.run_sync(
+            database_obj = await _run_notion_sync(
                 lambda: client.databases.update(database_id=notion_database_id, properties=db_updates)
             )
             props = _props_map(database_obj)
@@ -271,7 +277,7 @@ async def create_notion_page(
             dk = _env_prop("NOTION_PROPERTY_REPORT_DATE") or "報告日期"
             properties[dk] = {"date": {"start": iso_start}}
 
-    page = await anyio.to_thread.run_sync(
+    page = await _run_notion_sync(
         lambda: client.pages.create(
             parent={"database_id": notion_database_id},
             properties=properties,

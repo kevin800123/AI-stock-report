@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from datetime import date, datetime
@@ -14,8 +15,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
-from app.models import Report, Setting
+from app.models import Report
 from app.services.notion_service import create_notion_page
+from app.utils.retry import call_with_sync_retry
+
+logger = logging.getLogger(__name__)
 
 
 class _AiReportSummary(BaseModel):
@@ -47,28 +51,30 @@ class _AiReportSummary(BaseModel):
     core_logic: str = Field(..., description="看多或看空的濃縮重點")
 
 
-def _get_live_price(ticker_str: str | None) -> float | None:
-    """透過 yfinance 獲取台灣股市即時股價"""
+def _get_live_price_impl(ticker_str: str | None) -> float | None:
+    """透過 yfinance 獲取台灣股市即時股價（內部實作，可搭配重試）。"""
     if not ticker_str:
         return None
-    
-    # 提取 4 位或以上的數字代號
+
     match = re.search(r"(\d{4,6})", ticker_str)
     if not match:
         return None
     code = match.group(1)
-    
-    # 台灣市場可能是 .TW (上市) 或 .TWO (上櫃)
+
     for suffix in [".TW", ".TWO"]:
-        try:
-            ticker = yf.Ticker(f"{code}{suffix}")
-            # 使用 fast_info 獲取最後成交價，這比 history 快得多
-            price = ticker.fast_info.last_price
-            if price and price > 0:
-                return round(float(price), 2)
-        except Exception:
-            continue
+        ticker = yf.Ticker(f"{code}{suffix}")
+        price = ticker.fast_info.last_price
+        if price and price > 0:
+            return round(float(price), 2)
     return None
+
+
+def _get_live_price(ticker_str: str | None) -> float | None:
+    try:
+        return call_with_sync_retry(lambda: _get_live_price_impl(ticker_str))
+    except Exception:
+        logger.debug("yfinance price fetch failed for %s", ticker_str, exc_info=True)
+        return None
 
 
 def _extract_summary_fields(data, live_price: float | None = None) -> tuple[str | None, str | None, str | None, dict]:
@@ -102,11 +108,15 @@ def _extract_summary_fields(data, live_price: float | None = None) -> tuple[str 
     # 如果 AI 沒直接給目標價，但有給基礎數值與倍數，則進行計算
     if eps is not None:
         if target_low is None and pe_low is not None:
-            try: target_low = round(float(eps) * float(pe_low), 1)
-            except: pass
+            try:
+                target_low = round(float(eps) * float(pe_low), 1)
+            except (TypeError, ValueError):
+                pass
         if target_high is None and pe_high is not None:
-            try: target_high = round(float(eps) * float(pe_high), 1)
-            except: pass
+            try:
+                target_high = round(float(eps) * float(pe_high), 1)
+            except (TypeError, ValueError):
+                pass
 
     # 格式化輸出文字
     if target_low and target_high:
@@ -130,7 +140,7 @@ def _extract_summary_fields(data, live_price: float | None = None) -> tuple[str 
                 upside_str = f" (潛在空間: {upside_low}% ~ {upside_high}%)"
             elif upside_high is not None:
                 upside_str = f" (潛在空間: {upside_high}%)"
-        except:
+        except (TypeError, ValueError, ZeroDivisionError):
             pass
     
     # 根據評價方法調整文字標籤
@@ -199,9 +209,15 @@ def _extract_pdf_text(pdf_path: str) -> str:
         doc.close()
 
 
-async def _get_setting_value(session, key: str) -> str | None:
-    row = (await session.execute(select(Setting).where(Setting.key == key))).scalar_one_or_none()
-    return row.value if row else None
+def _safe_unlink_pdf(path: str | None) -> None:
+    if not path:
+        return
+    p = Path(path)
+    if p.is_file():
+        try:
+            p.unlink()
+        except OSError:
+            logger.warning("failed to delete pdf %s", path, exc_info=True)
 
 
 def _normalize_tickers(value) -> str | None:
@@ -315,13 +331,9 @@ async def process_report_file(report_id: int) -> None:
             # 支援 .env / 環境變數
             backend_root = Path(__file__).resolve().parents[2]
             load_dotenv(dotenv_path=backend_root / ".env", override=True)
-            gemini_api_key = (
-                await _get_setting_value(session, "gemini_api_key")
-                or os.getenv("GEMINI_API_KEY")
-                or os.getenv("GOOGLE_API_KEY")
-            )
+            gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
             if not gemini_api_key:
-                raise RuntimeError("缺少 Gemini API Key（請先設定 GEMINI_API_KEY 或在 settings 存入 gemini_api_key）")
+                raise RuntimeError("缺少 Gemini API Key（請設定 GEMINI_API_KEY）")
 
             system_prompt = (
                 "你是一個精準的金融 AI 助理。請從 PDF 文字中萃取數據並輸出 JSON。請遵循以下『精準模式』：\n"
@@ -364,7 +376,7 @@ async def process_report_file(report_id: int) -> None:
                     except Exception:
                         pass
 
-            data = await anyio.to_thread.run_sync(_call_gemini)
+            data = await anyio.to_thread.run_sync(lambda: call_with_sync_retry(_call_gemini))
             
             # 先提取代號以便抓取即時股價（僅需數字代號）
             if isinstance(data, BaseModel):
@@ -415,9 +427,12 @@ async def process_report_file(report_id: int) -> None:
 
             report.notion_page_id = notion_page_id
             report.status = "completed"
+            _safe_unlink_pdf(report.storage_path)
+            report.storage_path = ""
             await session.commit()
 
         except Exception as e:
+            logger.exception("process_report_file failed report_id=%s", report_id)
             report.status = "error"
             report.error_message = str(e)
             await session.commit()
