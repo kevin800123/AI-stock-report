@@ -1,0 +1,26 @@
+# 防止投顧 PDF 等上傳檔被誤 commit 到 backend/data/
+name: Block PDF in backend/data
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  no-pdf-in-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject tracked PDF under backend/data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t pdfs < <(git ls-files 'backend/data/' | grep -i '\.pdf$' || true)
+          if [ "${#pdfs[@]}" -gt 0 ]; then
+            echo "::error::Do not commit PDF files under backend/data/ (use local backend/data/reports/ only)."
+            printf '%s\n' "${pdfs[@]}"
+            exit 1
+          fi
+          echo "OK: no tracked PDF under backend/data/"

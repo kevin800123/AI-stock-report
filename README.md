@@ -137,6 +137,7 @@ GitHub Actions 使用 **`npm ci`**，請在本機變更依賴後執行 **`npm in
 
 - **API 網址**：瀏覽器本來就會向後端發請求，**網址無法對使用者完全隱藏**；頁尾 **僅在開發模式 (`npm run dev`)** 顯示 API 字樣，正式站不顯示，但開發者工具仍可能看到請求目標。
 - **金鑰**：Gemini / Notion 等**僅能放後端環境變數**（或本機 `backend/.env`），**不要**寫進前端或公開 repo。
+- **投顧 PDF**：**禁止**提交至 Git（`backend/data/reports/` 僅供本機上傳目錄，已列入 `.gitignore`）。若曾誤傳至公開 repo，需以 `git filter-repo` 等工具清除整段 history 後 force push；並可向 [GitHub Support](https://support.github.com/contact) 申請清除舊 commit 的快取。
 - **摘要頁 Notion 連結**：捷徑網址寫在前端原始碼中，打包後仍可被檢視。若 Notion 頁面設為「知道連結的任何人」可讀／可編輯，等同對能開啟你網站的人暴露該權限；請以 Notion 的分享範圍與成員權限控管。連結僅為瀏覽器導向 `https://www.notion.so/...`，不經後端代理，無 SSRF 問題。
 
 ---
