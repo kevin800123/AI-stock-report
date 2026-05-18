@@ -3,11 +3,18 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import UPLOAD_RATE_LIMIT
 from app.database import get_session
+from app.deps.security import (
+    assert_pdf_content,
+    limiter,
+    read_upload_with_limits,
+    verify_api_key,
+)
 from app.models import Report
 from app.schemas.report import ReportResponse
 from app.services.report_processor import process_report_file
@@ -21,18 +28,22 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload", response_model=ReportResponse)
+@limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_report(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    _: None = Depends(verify_api_key),
     session: AsyncSession = Depends(get_session),
 ):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="只接受 PDF 檔案")
 
+    content = await read_upload_with_limits(file, request)
+    assert_pdf_content(content)
+
     file_id = uuid4().hex
     storage_path = REPORTS_DIR / f"{file_id}.pdf"
-
-    content = await file.read()
     storage_path.write_bytes(content)
 
     report = Report(
@@ -57,7 +68,11 @@ async def list_reports(session: AsyncSession = Depends(get_session)):
 
 
 @router.delete("/{report_id}", status_code=204)
-async def delete_report(report_id: int, session: AsyncSession = Depends(get_session)):
+async def delete_report(
+    report_id: int,
+    _: None = Depends(verify_api_key),
+    session: AsyncSession = Depends(get_session),
+):
     report = (await session.execute(select(Report).where(Report.id == report_id))).scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="找不到報告")

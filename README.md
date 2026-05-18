@@ -97,13 +97,13 @@ DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 ### 後端（Render）
 
 1. 將 repo 推到 GitHub，至 [Render](https://dashboard.render.com) → **Blueprint** 或 **Web Service**，對應根目錄 `render.yaml` 或手動指定 `backend`、`uvicorn app.main:app --host 0.0.0.0 --port $PORT`。
-2. **環境變數**：`GEMINI_API_KEY`、`NOTION_API_KEY`、`NOTION_DATABASE_ID`；**強烈建議**另建 **PostgreSQL**，將 **Internal Database URL** 設為 `DATABASE_URL`。
+2. **環境變數**：`GEMINI_API_KEY`、`NOTION_API_KEY`、`NOTION_DATABASE_ID`；上傳防護 **`UPLOAD_API_KEY`**（隨機長字串）、**`REQUIRE_UPLOAD_API_KEY=true`**（見 `render.yaml`）；**強烈建議**另建 **PostgreSQL**，將 **Internal Database URL** 設為 `DATABASE_URL`。
 3. 部署後測試：`https://你的服務.onrender.com/health` → `{"status":"ok"}`。
 4. **免費 Web Service** 閒置會休眠，**首次請求常需數十秒**；須穩定低延遲請升級方案。
 
 ### 前端（GitHub Pages）
 
-1. **Repository secret**（Actions）：**`VITE_API_BASE_URL`** = `https://你的服務.onrender.com`（**無結尾斜線**）。
+1. **Repository secret**（Actions）：**`VITE_API_BASE_URL`** = `https://你的服務.onrender.com`（**無結尾斜線**）；**`VITE_UPLOAD_API_KEY`** = 與 Render 上 `UPLOAD_API_KEY` **相同**（供上傳／刪除帶 `X-API-Key`）。
 2. Push 到 `main` 或手動執行 workflow **Deploy to GitHub Pages**。
 3. **Settings → Pages**：
    - **免費帳號**：私有 repo **無法**使用 Pages，請改為 **Public**，或升級 GitHub Pro。
@@ -118,8 +118,8 @@ GitHub Actions 使用 **`npm ci`**，請在本機變更依賴後執行 **`npm in
 
 | 位置 | 變數 | 說明 |
 |------|------|------|
-| Render Web Service | `GEMINI_API_KEY`, `NOTION_*`, `DATABASE_URL` | 後端與資料庫 |
-| GitHub Actions Secret | `VITE_API_BASE_URL` | 建置前端時嵌入後端根網址 |
+| Render Web Service | `GEMINI_API_KEY`, `NOTION_*`, `DATABASE_URL`, `UPLOAD_API_KEY`, `REQUIRE_UPLOAD_API_KEY` | 後端、資料庫與上傳閘門 |
+| GitHub Actions Secret | `VITE_API_BASE_URL`, `VITE_UPLOAD_API_KEY` | 建置前端時嵌入 API 網址與上傳 key |
 
 後端 CORS 已包含 **`https://*.github.io`**。
 
@@ -136,7 +136,8 @@ GitHub Actions 使用 **`npm ci`**，請在本機變更依賴後執行 **`npm in
 ## 🔒 資安與隱私（簡述）
 
 - **API 網址**：瀏覽器本來就會向後端發請求，**網址無法對使用者完全隱藏**；頁尾 **僅在開發模式 (`npm run dev`)** 顯示 API 字樣，正式站不顯示，但開發者工具仍可能看到請求目標。
-- **金鑰**：Gemini / Notion 等**僅能放後端環境變數**（或本機 `backend/.env`），**不要**寫進前端或公開 repo。
+- **金鑰**：Gemini / Notion 等**僅能放後端環境變數**（或本機 `backend/.env`），**不要**寫進公開 repo。
+- **上傳 API key**：`POST /reports/upload` 與 `DELETE /reports/{id}` 需 `X-API-Key`（10MB 上限、PDF magic bytes、上傳 **5 次/分鐘/IP**）。正式站前端透過 `VITE_UPLOAD_API_KEY` 帶入——**打包後仍可被檢視**，僅能擋不知道 key 的隨機濫用，無法取代登入或後端代傳；請定期輪替 key 並監控 Render／Gemini 用量。
 - **投顧 PDF**：**禁止**提交至 Git（`backend/data/reports/` 僅供本機上傳目錄，已列入 `.gitignore`）。若曾誤傳至公開 repo，需以 `git filter-repo` 等工具清除整段 history 後 force push；並可向 [GitHub Support](https://support.github.com/contact) 申請清除舊 commit 的快取。
 - **摘要頁 Notion 連結**：捷徑網址寫在前端原始碼中，打包後仍可被檢視。若 Notion 頁面設為「知道連結的任何人」可讀／可編輯，等同對能開啟你網站的人暴露該權限；請以 Notion 的分享範圍與成員權限控管。連結僅為瀏覽器導向 `https://www.notion.so/...`，不經後端代理，無 SSRF 問題。
 

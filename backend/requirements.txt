@@ -10,3 +10,4 @@ notion-client
 pydantic
 google-genai
 yfinance
+slowapi

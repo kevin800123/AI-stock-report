@@ -8,9 +8,12 @@ const apiBase =
 // Render 免費方案冷啟動常超過 30s，正式站預設 120s；本機維持 30s。可建置變數 VITE_API_TIMEOUT_MS 覆寫。
 const requestTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS) || (import.meta.env.DEV ? 30000 : 120000)
 
+const uploadApiKey = import.meta.env.VITE_UPLOAD_API_KEY || ''
+
 const api = axios.create({
   baseURL: apiBase,
   timeout: requestTimeout,
+  headers: uploadApiKey ? { 'X-API-Key': uploadApiKey } : {},
 })
 
 export function getReports() {
