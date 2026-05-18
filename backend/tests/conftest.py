@@ -17,15 +17,18 @@ os.environ.setdefault("UPLOAD_MAX_BYTES", str(10 * 1024 * 1024))
 os.environ["UPLOAD_RATE_LIMIT"] = "1000/minute"
 
 
-def _ensure_reports_sha256_column():
+def _ensure_reports_schema():
+    """CI 為全新 DB：先建表，再對舊庫補 content_sha256 欄位。"""
     import asyncio
 
     from sqlalchemy import text
 
-    from app.database import engine
+    import app.models  # noqa: F401 — register ORM
+    from app.database import Base, engine
 
     async def _run():
         async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
             rows = await conn.execute(text("PRAGMA table_info(reports)"))
             cols = {r[1] for r in rows.fetchall()}
             if "content_sha256" not in cols:
@@ -42,7 +45,7 @@ def _ensure_reports_sha256_column():
     asyncio.run(_run())
 
 
-_ensure_reports_sha256_column()
+_ensure_reports_schema()
 
 
 @pytest.fixture

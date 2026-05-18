@@ -23,4 +23,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run pytest
+        env:
+          UPLOAD_RATE_LIMIT: 1000/minute
         run: pytest -q
