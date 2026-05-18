@@ -13,6 +13,8 @@ if str(BACKEND_ROOT) not in sys.path:
 os.environ.setdefault("UPLOAD_API_KEY", "test-upload-key")
 os.environ.setdefault("REQUIRE_UPLOAD_API_KEY", "true")
 os.environ.setdefault("UPLOAD_MAX_BYTES", str(10 * 1024 * 1024))
+# 測試套件含多次上傳，避免 slowapi 5/min 導致非預期 429
+os.environ["UPLOAD_RATE_LIMIT"] = "1000/minute"
 
 
 def _ensure_reports_sha256_column():
