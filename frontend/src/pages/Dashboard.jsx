@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone'
 import { AlertCircle, CheckCircle2, FileUp, Loader2, RefreshCw, Trash2, XCircle, Zap } from 'lucide-react'
 
 import { deleteReport, getReports, pingHealth, uploadReport } from '../api.js'
+import { getUploadSizeError, UPLOAD_MAX_BYTES, uploadMaxSizeLabel } from '../uploadLimits.js'
 
 function StatusBadge({ status }) {
   const s = (status || '').toLowerCase()
@@ -62,8 +63,15 @@ export default function Dashboard() {
     async (acceptedFiles) => {
       const file = acceptedFiles?.[0]
       if (!file) return
+      const sizeError = getUploadSizeError(file)
+      if (sizeError) {
+        setError(sizeError)
+        setHint('')
+        return
+      }
       setUploading(true)
       setHint('')
+      setError('')
       try {
         await uploadReport(file)
         setHint('已上傳，正在背景解析與摘要中...')
@@ -111,9 +119,24 @@ export default function Dashboard() {
     }
   }, [canWakeBackend, fetchReports])
 
+  const onDropRejected = useCallback((rejections) => {
+    const tooLarge = rejections.some((r) =>
+      r.errors.some((e) => e.code === 'file-too-large'),
+    )
+    if (tooLarge) {
+      setError(`檔案超過大小上限（${uploadMaxSizeLabel()}）`)
+      setHint('')
+      return
+    }
+    setError('僅支援單一 PDF 檔案')
+    setHint('')
+  }, [])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: { 'application/pdf': ['.pdf'] },
+    maxSize: UPLOAD_MAX_BYTES,
     multiple: false,
     disabled: uploading,
   })
@@ -211,7 +234,7 @@ export default function Dashboard() {
             )}
           </div>
           <div className="mt-1 hidden text-xs text-zinc-500 sm:block">亦支援拖曳 PDF 到此處</div>
-          <div className="mt-1 text-xs text-zinc-500">僅支援 .pdf，單檔上傳</div>
+          <div className="mt-1 text-xs text-zinc-500">僅支援 .pdf，單檔上傳，上限 {uploadMaxSizeLabel()}</div>
         </div>
 
         {hint ? (

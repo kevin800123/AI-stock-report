@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+import { getUploadSizeError } from './uploadLimits.js'
+
 // 本機開發：預設連 localhost。正式／GitHub Pages 建置時請設 VITE_API_BASE_URL（指向已上線的 FastAPI）
 const apiBase =
   import.meta.env.VITE_API_BASE_URL ||
@@ -21,6 +23,10 @@ export function getReports() {
 }
 
 export function uploadReport(file) {
+  const sizeError = getUploadSizeError(file)
+  if (sizeError) {
+    return Promise.reject(new Error(sizeError))
+  }
   const form = new FormData()
   form.append('file', file)
   return api

@@ -121,7 +121,7 @@ GitHub Actions 使用 **`npm ci`**，請在本機變更依賴後執行 **`npm in
 | Render Web Service | `GEMINI_API_KEY`, `NOTION_*`, `DATABASE_URL`, `UPLOAD_API_KEY`, `REQUIRE_UPLOAD_API_KEY` | 後端、資料庫與上傳閘門 |
 | GitHub Actions Secret | `VITE_API_BASE_URL`, `VITE_UPLOAD_API_KEY` | 建置前端時嵌入 API 網址與上傳 key |
 
-後端 CORS 已包含 **`https://*.github.io`**。
+後端 CORS 僅允許 **`https://kevin800123.github.io`**（你的 GitHub Pages Origin；本機 `localhost` / `127.0.0.1` 亦在允許清單）。
 
 ### 常見問題
 
